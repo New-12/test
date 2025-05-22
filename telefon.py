@@ -1,93 +1,59 @@
 import socket
-import cv2
 import os
 
-def receive_file(sock, filename):
-    with open(filename, "wb") as f:
-        while True:
-            data = sock.recv(4096)
-            if not data:
-                break
-            f.write(data)
+PORT = 65432
+CONFIG_FILE = "config.txt"
 
-def send_file(sock, filepath):
-    with open(filepath, "rb") as f:
-        while True:
-            bytes_read = f.read(4096)
-            if not bytes_read:
-                break
-            sock.sendall(bytes_read)
+def get_pc_ip():
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, "r") as f:
+            ip = f.read().strip()
+            if ip:
+                return ip
 
-def capture_photo():
-    cam = cv2.VideoCapture(0)
-    ret, frame = cam.read()
-    cam.release()
-    if ret:
-        cv2.imwrite("foto.jpg", frame)
-        return True
-    else:
-        return False
+    ip = input("Lütfen PC IP adresini girin : ").strip()
+    with open(CONFIG_FILE, "w") as f:
+        f.write(ip)
+    return ip
 
 def main():
-    # PC'nin ip adresini burada parametre olarak ver (telefon pc'ye bağlanacak)
-    pc_ip = "78.177.183.239"  # Örn: "192.168.1.10"
-    port = 12345
-    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client_socket.connect((pc_ip, port))
-    print(f"{pc_ip}:{port} adresine bağlandı.")
+    pc_ip = get_pc_ip()
+    print(f"PC IP adresi: {pc_ip}")
 
-    while True:
-        data = client_socket.recv(1024).decode()
-        if not data:
-            break
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.connect((pc_ip, PORT))
+            print("PC'ye bağlanıldı.")
+        except Exception as e:
+            print("Bağlanırken hata:", e)
+            return
 
-        if data == "/quit":
-            print("Sunucu bağlantıyı kapattı.")
-            break
+        while True:
+            komut = input("Komut gir (/foto, /dosya_gonder dosya_adi.txt, çıkış için q): ").strip()
 
-        elif data == "/foto":
-            print("Fotoğraf çekiliyor...")
-            if capture_photo():
-                client_socket.sendall(b"START")
-                with open("foto.jpg", "rb") as f:
-                    while True:
-                        bytes_read = f.read(4096)
-                        if not bytes_read:
-                            break
-                        client_socket.sendall(bytes_read)
-                print("Fotoğraf gönderildi.")
+            if komut.lower() == "q":
+                print("Bağlantı sonlandırıldı.")
+                break
+
+            s.send(komut.encode())
+            data = s.recv(1024)
+
+            if data == b"FOTO":
+                print("Fotoğraf çekme komutu gönderildi. (Burada telefon kamerayı açacak)")
+
+            elif data.startswith(b"FILESTART"):
+                content = data[9:]
+                # Eğer dosya büyükse bu basit haliyle yetmeyebilir, iyileştirilebilir
+                filename = komut.split(maxsplit=1)[1]
+                with open(filename, "wb") as f:
+                    f.write(content)
+                print(f"{filename} dosyası alındı.")
+
+            elif data == b"FILE_NOT_FOUND":
+                print("Dosya bulunamadı.")
+
             else:
-                print("Fotoğraf çekilemedi.")
-
-        elif data.startswith("/dosya-gonder "):
-            filename = data.split(" ", 1)[1]
-            if os.path.exists(filename):
-                client_socket.sendall(b"START")
-                with open(filename, "rb") as f:
-                    while True:
-                        bytes_read = f.read(4096)
-                        if not bytes_read:
-                            break
-                        client_socket.sendall(bytes_read)
-                print(f"{filename} dosyası gönderildi.")
-            else:
-                print(f"{filename} bulunamadı.")
-
-        elif data.startswith("/dosya-al "):
-            filename = data.split(" ", 1)[1]
-            print(f"Dosya alınıyor: {filename}")
-            with open(filename, "wb") as f:
-                while True:
-                    data_file = client_socket.recv(4096)
-                    if not data_file:
-                        break
-                    f.write(data_file)
-            print(f"{filename} dosyası alındı.")
-
-        else:
-            print(f"Bilinmeyen komut: {data}")
-
-    client_socket.close()
+                print("Sunucudan cevap:", data.decode())
 
 if __name__ == "__main__":
     main()
