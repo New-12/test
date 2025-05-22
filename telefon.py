@@ -30,7 +30,7 @@ def capture_photo():
 
 def main():
     # PC'nin ip adresini burada parametre olarak ver (telefon pc'ye bağlanacak)
-    pc_ip = "PC_IP_BURAYA"  # Örn: "192.168.1.10"
+    pc_ip = "78.177.183.239"  # Örn: "192.168.1.10"
     port = 12345
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client_socket.connect((pc_ip, port))
