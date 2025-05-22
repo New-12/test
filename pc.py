@@ -1,80 +1,54 @@
 import socket
+import threading
 import os
 
-def send_command(sock, cmd):
-    sock.sendall(cmd.encode())
+HOST = "0.0.0.0"  # Tüm IP adreslerinden bağlantı kabul et
+PORT = 65432
 
-def recv_data(sock):
-    data = b""
+def handle_client(conn, addr):
+    print(f"Bağlantı kuruldu: {addr}")
     while True:
-        packet = sock.recv(4096)
-        if not packet:
-            break
-        data += packet
-    return data
-
-def receive_file(sock, filename):
-    with open(filename, "wb") as f:
-        while True:
-            data = sock.recv(4096)
+        try:
+            data = conn.recv(1024).decode()
             if not data:
                 break
-            f.write(data)
+            print(f"Gelen komut: {data}")
 
-def send_file(sock, filepath):
-    with open(filepath, "rb") as f:
-        while True:
-            bytes_read = f.read(4096)
-            if not bytes_read:
-                break
-            sock.sendall(bytes_read)
+            if data == "/foto":
+                # Fotoğraf çekme komutu, telefon yapacak, burada sadece onay veriyoruz
+                conn.send("FOTO".encode())
+
+            elif data.startswith("/dosya_gonder"):
+                # Örnek: /dosya_gonder dosya_adi.txt
+                _, filename = data.split(maxsplit=1)
+                if os.path.exists(filename):
+                    with open(filename, "rb") as f:
+                        content = f.read()
+                    conn.send(b"FILESTART" + content + b"FILEEND")
+                else:
+                    conn.send(b"FILE_NOT_FOUND")
+
+            elif data == "/baglan":
+                conn.send("BAGLANILDI".encode())
+
+            else:
+                conn.send("BILINMEYEN_KOMUT".encode())
+
+        except:
+            break
+    conn.close()
+    print(f"Bağlantı kapandı: {addr}")
 
 def main():
-    pc_ip = "0.0.0.0"  # Dinleme için tüm arayüzler
-    port = 12345
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.bind((pc_ip, port))
-    server_socket.listen(1)
-    print(f"Sunucu dinlemede: {pc_ip}:{port}")
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind((HOST, PORT))
+        s.listen()
+        print(f"Sunucu {HOST}:{PORT} üzerinde dinleniyor...")
 
-    conn, addr = server_socket.accept()
-    print(f"Bağlantı geldi: {addr}")
-
-    while True:
-        cmd = input("Komut (/foto, /dosya-gonder dosyaadi, /dosya-al dosyaadi, /quit): ")
-        if cmd == "/quit":
-            send_command(conn, "/quit")
-            break
-
-        if cmd.startswith("/dosya-gonder "):
-            filename = cmd.split(" ", 1)[1]
-            if not os.path.exists(filename):
-                print("Dosya bulunamadı.")
-                continue
-            send_command(conn, cmd)
-            print(f"Dosya gönderiliyor: {filename}")
-            send_file(conn, filename)
-            print("Dosya gönderimi tamamlandı.")
-
-        elif cmd.startswith("/dosya-al "):
-            filename = cmd.split(" ", 1)[1]
-            send_command(conn, cmd)
-            print(f"Dosya alınıyor: {filename}")
-            receive_file(conn, filename)
-            print("Dosya alımı tamamlandı.")
-
-        elif cmd == "/foto":
-            send_command(conn, "/foto")
-            print("Fotoğraf bekleniyor...")
-            receive_file(conn, "telefon_fotografi.jpg")
-            print("Fotoğraf alındı: telefon_fotografi.jpg")
-
-        else:
-            send_command(conn, cmd)
-            print("Bilinmeyen komut.")
-
-    conn.close()
-    server_socket.close()
+        while True:
+            conn, addr = s.accept()
+            thread = threading.Thread(target=handle_client, args=(conn, addr))
+            thread.start()
 
 if __name__ == "__main__":
     main()
