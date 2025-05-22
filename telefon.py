@@ -1,24 +1,31 @@
 import socket
 
-SERVER_IP = "PC'nin_İP_adresi"  # Örn: "192.168.1.10" veya public IP
-SERVER_PORT = 9999
+# Kullanıcıdan PC'nin IP adresini alıyoruz
+pc_ip = input("Bağlanmak istediğiniz PC'nin IP adresini girin: ")
+port = 12345  # pc.py ile aynı port olmalı
 
-def start_client():
+def main():
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client.connect((SERVER_IP, SERVER_PORT))
-    print("[*] Sunucuya bağlandı")
+    try:
+        client.connect((pc_ip, port))
+        print(f"[+] {pc_ip}:{port} adresine bağlanıldı.")
 
-    while True:
-        komut = input("Komut gönder: ")
-        if komut == "/cikis":
-            print("Bağlantı kapatılıyor")
-            client.sendall("/kapat".encode('utf-8'))
-            break
-        client.sendall(komut.encode('utf-8'))
-        cevap = client.recv(4096).decode('utf-8')
-        print(f"Sunucu: {cevap}")
+        while True:
+            komut = input("Komut girin (/foto, /dosya, çıkmak için 'exit'): ")
 
-    client.close()
+            if komut.lower() == 'exit':
+                break
+
+            client.sendall(komut.encode())
+
+            cevap = client.recv(4096).decode()
+            print(f"PC'den cevap: {cevap}")
+
+    except Exception as e:
+        print(f"Hata: {e}")
+    finally:
+        client.close()
+        print("Bağlantı kapandı.")
 
 if __name__ == "__main__":
-    start_client()
+    main()
