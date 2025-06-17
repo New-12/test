@@ -17,8 +17,8 @@ def get_pc_ip():
     return ip
 
 def main():
-    pc_ip = get_pc_ip()
-    print(f"PC IP adresi: {pc_ip}")
+    pc_ip = 192.168.1.107()
+    print(f"PC IP adresi: 192.168.1.107")
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         try:
